@@ -152,6 +152,10 @@ options = SimpleNamespace(
     keepSections = True,
 
     ##
+    # Whether to preserve section titles
+    keepOnlyTopLevel = False,
+
+    ##
     # Whether to preserve lists
     keepLists = False,
 
@@ -539,7 +543,7 @@ class Extractor(object):
     """
     An extraction task on a article.
     """
-    def __init__(self, id, revid, title, lines):
+    def __init__(self, id, revid, title, lines,catSet):
         """
         :param id: id of page.
         :param title: tutle of page.
@@ -548,6 +552,7 @@ class Extractor(object):
         self.id = id
         self.revid = revid
         self.title = title
+        self.catSet=catSet
         self.text = ''.join(lines)
         self.magicWords = MagicWords()
         self.frame = Frame()
@@ -567,7 +572,8 @@ class Extractor(object):
                 'id': self.id,
                 'url': url,
                 'title': self.title,
-                'text': "\n".join(text)
+                'categories': ", ".join(list(self.catSet)),
+                'text': "\r\n".join(text)
             }
             if options.print_revision:
                 json_data['revid'] = self.revid
@@ -582,7 +588,7 @@ class Extractor(object):
             if options.print_revision:
                 header = '<doc id="%s" revid="%s" url="%s" title="%s">\n' % (self.id, self.revid, url, self.title)
             else:
-                header = '<doc id="%s" url="%s" title="%s">\n' % (self.id, url, self.title)
+                header = '<doc id="%s" url="%s" title="%s" categories="%s">\n' % (self.id, url, self.title,", ".join(list(self.catSet)))
             footer = "\n</doc>\n"
             if out == sys.stdout:   # option -a or -o -
                 header = header.encode('utf-8')
@@ -2558,6 +2564,7 @@ def compact(text):
                 page.append("<h%d>%s</h%d>" % (lev, title, lev))
             if title and title[-1] not in '!?':
                 title += '.'    # terminate sentence.
+            # if(lev==1 or not options.keepOnlyTopLevel):
             headers[lev] = title
             # drop previous headers
             for i in list(headers.keys()):
@@ -2642,7 +2649,8 @@ def compact(text):
             if options.keepSections:
                 items = sorted(headers.items())
                 for i, v in items:
-                    page.append("Section::::" + v)
+                    if(i <=2 or not options.keepOnlyTopLevel):
+                        page.append("Section::::" + v)
             headers.clear()
             page.append(line)  # first line
             emptySection = False
@@ -2668,7 +2676,7 @@ class NextFile(object):
     Synchronous generation of next available file name.
     """
 
-    filesPerDir = 100
+    filesPerDir = 10000
 
     def __init__(self, path_name):
         self.path_name = path_name
@@ -2976,7 +2984,7 @@ def process_dump(input_file, template_file, out_file, file_size, file_compress,
                     delay += 10
             if delay:
                 logging.info('Delay %ds', delay)
-            job = (id, revid, title, page, page_num)
+            job = (id, revid, title, page, catSet,page_num)
             jobs_queue.put(job) # goes to any available extract_process
             page_num += 1
         page = None             # free memory
@@ -3024,9 +3032,9 @@ def extract_process(opts, i, jobs_queue, output_queue):
     while True:
         job = jobs_queue.get()  # job is (id, title, page, page_num)
         if job:
-            id, revid, title, page, page_num = job
+            id, revid, title, page, catSet, page_num  = job
             try:
-                e = Extractor(*job[:4]) # (id, revid, title, page)
+                e = Extractor(*job[:5]) # (id, revid, title, page,catSet)
                 page = None              # free memory
                 e.extract(out)
                 text = out.getvalue()
@@ -3105,7 +3113,7 @@ def reduce_process(opts, output_queue, spool_length,
 # ----------------------------------------------------------------------
 
 # Minimum size of output files
-minFileSize = 200 * 1024
+minFileSize = 1 * 1024
 
 def main():
 
@@ -3133,6 +3141,8 @@ def main():
                         help="preserve links")
     groupP.add_argument("-s", "--sections", action="store_true",
                         help="preserve sections")
+    groupP.add_argument("--sections_top_level", action="store_true",
+                        help="preserve only the top level sectionsections")
     groupP.add_argument("--lists", action="store_true",
                         help="preserve lists")
     groupP.add_argument("-ns", "--namespaces", default="", metavar="ns1,ns2",
@@ -3176,6 +3186,7 @@ def main():
 
     options.keepLinks = args.links
     options.keepSections = args.sections
+    options.keepOnlyTopLevel = args.sections_top_level
     options.keepLists = args.lists
     options.toHTML = args.html
     options.write_json = args.json
@@ -3190,6 +3201,7 @@ def main():
 
     try:
         power = 'kmg'.find(args.bytes[-1].lower()) + 1
+
         file_size = int(args.bytes[:-1]) * 1024 ** power
         if file_size < minFileSize:
             raise ValueError()

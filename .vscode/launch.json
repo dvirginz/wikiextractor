@@ -1,0 +1,17 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "args": ["C:\\Users\\t-dvginz\\Downloads\\enwiki-20200401-pages-articles.xml.bz2", "-o", ".//etracted", "--min_text_length","2048",
+                "--sections", "--sections_top_level","--filter_disambig_pages","--processes","8","--bytes","1k"],
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}//WikiExtractor.py",
+            "console": "integratedTerminal"
+        }
+    ]
+}
